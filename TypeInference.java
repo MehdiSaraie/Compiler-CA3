@@ -113,7 +113,9 @@ public class TypeInference extends Visitor<Type> {
                             }
                             if ((left_el_type instanceof NoType || left_el_type instanceof IntType) && (right_el_type instanceof IntType || right_el_type instanceof NoType) ||
                                     (left_el_type instanceof NoType || left_el_type instanceof BoolType) && (right_el_type instanceof BoolType || right_el_type instanceof NoType) ||
-                                    (left_el_type instanceof NoType || left_el_type instanceof StringType) && (right_el_type instanceof StringType || right_el_type instanceof NoType))
+                                    (left_el_type instanceof NoType || left_el_type instanceof StringType) && (right_el_type instanceof StringType || right_el_type instanceof NoType) ||
+                                    (left_el_type instanceof NoType || left_el_type instanceof VoidType) && (right_el_type instanceof VoidType || right_el_type instanceof NoType) ||
+                                    (left_el_type instanceof NoType || left_el_type instanceof FptrType) && (right_el_type instanceof FptrType || right_el_type instanceof NoType))
                                 continue;
                             else{
                                 flag = true;
