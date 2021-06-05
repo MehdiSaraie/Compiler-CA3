@@ -82,16 +82,64 @@ public class TypeInference extends Visitor<Type> {
         }
 
         if (operator.equals(BinaryOperator.eq) || operator.equals(BinaryOperator.neq)){ //is two voids valid?
-            if (tl instanceof IntType && tr instanceof IntType || tl instanceof BoolType && tr instanceof BoolType || tl instanceof StringType && tr instanceof StringType ||
-                    (tl instanceof VoidType || tl instanceof FptrType) && (tr instanceof VoidType || tr instanceof FptrType))
+            if (tl instanceof IntType && tr instanceof IntType || tl instanceof BoolType && tr instanceof BoolType ||
+                    tl instanceof StringType && tr instanceof StringType || tl instanceof VoidType && tr instanceof VoidType)
+                return new BoolType();
+            if (tl instanceof FptrType && tr instanceof FptrType){
+                try {
+                    FunctionSymbolTableItem left_funcSym = (FunctionSymbolTableItem) (SymbolTable.root.getItem(FunctionSymbolTableItem.START_KEY + ((FptrType) tl).getFunctionName()));
+                    FunctionSymbolTableItem right_funcSym = (FunctionSymbolTableItem) (SymbolTable.root.getItem(FunctionSymbolTableItem.START_KEY + ((FptrType) tr).getFunctionName()));
+                    ArrayList<Type> left_types = left_funcSym.getArgTypes();
+                    left_types.add(left_funcSym.getReturnType());
+                    ArrayList<Type> right_types = right_funcSym.getArgTypes();
+                    right_types.add(right_funcSym.getReturnType());
+                    boolean flag = true;
+                    if (left_types.size() == right_types.size()) {
+                        flag = false;
+                        for (int i = 0; i < left_types.size(); i++) {
+                            Type left_type = left_types.get(i);
+                            Type right_type = right_types.get(i);
+                            Type left_el_type = left_type;
+                            Type right_el_type = right_type;
+                            while (left_el_type instanceof ListType){
+                                if (right_el_type instanceof ListType) {
+                                    left_el_type = ((ListType) left_el_type).getType();
+                                    right_el_type = ((ListType) right_el_type).getType();
+                                }
+                                else{
+                                    flag = true;
+                                    break;
+                                }
+                            }
+                            if ((left_el_type instanceof NoType || left_el_type instanceof IntType) && (right_el_type instanceof IntType || right_el_type instanceof NoType) ||
+                                    (left_el_type instanceof NoType || left_el_type instanceof BoolType) && (right_el_type instanceof BoolType || right_el_type instanceof NoType) ||
+                                    (left_el_type instanceof NoType || left_el_type instanceof StringType) && (right_el_type instanceof StringType || right_el_type instanceof NoType))
+                                continue;
+                            else{
+                                flag = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (!flag)
+                        return new BoolType();
+                }
+                catch (ItemNotFoundException e){
+                    return new NoType();
+                }
+
+            }
+            if (tl instanceof VoidType && tr instanceof FptrType || tr instanceof VoidType && tl instanceof FptrType)
                 return new BoolType();
             if (!(tl instanceof ListType) && tr instanceof NoType || !(tr instanceof ListType) && tl instanceof NoType)
                 return new NoType();
         }
 
         if (operator.equals(BinaryOperator.append)){
-            if (tl instanceof ListType && tr instanceof NoType || tl instanceof NoType && !(tr instanceof FptrType || tr instanceof VoidType))
+            if (tl instanceof NoType && !(tr instanceof FptrType || tr instanceof VoidType))
                 return new NoType();
+            if (tl instanceof ListType && tr instanceof NoType)
+                return new ListType(((ListType)tl).getType());
 
             if (tl instanceof ListType) {
                 Type left_el_type = ((ListType)tl).getType();
@@ -247,34 +295,30 @@ public class TypeInference extends Visitor<Type> {
                 arg_type = argsWithKey.get(arg_name).accept(this);
                 functionSymbolTableItem.addArgType(arg_type);
             }
-            /*  this part may be in TypeSetter (in FunctionDeclaration)
+             // this part may be in TypeSetter (in FunctionDeclaration)
             //SymbolTable.push(functionSymbolTableItem);
             functionDeclaration.accept(typeSetter);
             return functionSymbolTableItem.getReturnType();
-            */
+
         }
         catch (ItemNotFoundException e){
         }
-        return null;
+        return new NoType();
     }
 
     @Override
     public Type visit(ListValue listValue) {
         //TODO
         ArrayList<Expression> elements = listValue.getElements();
-        //if (elements.isEmpty())
-        //    return new ListType(new NoType());
         Type old_type = new NoType();
-        boolean flag = false, diff_flag = false;
+        boolean diff_flag = false;
         for (Expression element: elements){
             Type new_type = element.accept(this);
             if (new_type instanceof NoType){
-                flag = true;
                 continue;
             }
             if (new_type instanceof VoidType){
                 //void error
-                flag = true;
                 continue;
             }
             if (old_type instanceof NoType){
@@ -305,9 +349,8 @@ public class TypeInference extends Visitor<Type> {
         }
         if (diff_flag){
             //different types error
-        }
-        if (flag || diff_flag)
             return new NoType();
+        }
         return new ListType(old_type);
     }
 
