@@ -67,7 +67,10 @@ public class TypeSetterErrorCatcher  extends Visitor<Void> {
     @Override
     public Void visit(ConditionalStmt conditionalStmt) {
         Type cond_type = conditionalStmt.getCondition().accept(typeInferenceErrorCatcher);
-        if (!(cond_type instanceof BoolType || cond_type instanceof NoType)){
+        if (cond_type instanceof VoidType){
+            conditionalStmt.addError(new CantUseValueOfVoidFunction(conditionalStmt.getLine()));
+        }
+        else if (!(cond_type instanceof BoolType || cond_type instanceof NoType)){
             conditionalStmt.addError(new ConditionNotBool(conditionalStmt.getLine()));
         }
         conditionalStmt.getThenBody().accept(this);
@@ -92,30 +95,93 @@ public class TypeSetterErrorCatcher  extends Visitor<Void> {
         else if (arg_type instanceof FptrType){
             print.addError(new UnsupportedTypeForPrint(print.getLine()));
         }
-
         return null;
     }
 
     @Override
     public Void visit(ReturnStmt returnStmt) {
-        Type cur_return_type = returnStmt.getReturnedExpr().accept(typeInferenceErrorCatcher);
+        Expression returned_expression = returnStmt.getReturnedExpr();
+        Type cur_return_type = returned_expression.accept(typeInferenceErrorCatcher);
         FunctionSymbolTableItem cur_func = TypeSetterErrorCatcher.func_stack.pop();
         TypeSetterErrorCatcher.func_stack.push(cur_func);
         Type function_return_type = cur_func.getReturnType();
 
-//        if(function_return_type == null || function_return_type instanceof NoType){
-//            cur_func.setReturnType(cur_return_type);
-//        }
-        // TODO error return type
+        if (cur_return_type instanceof VoidType && !(returned_expression instanceof VoidValue)){
+            returnStmt.addError(new CantUseValueOfVoidFunction(returnStmt.getLine()));
+            return null;
+        }
 
-        // TODO fptr and list
-        if(!((function_return_type instanceof IntType && cur_return_type instanceof IntType) ||
-                (function_return_type instanceof StringType && cur_return_type instanceof StringType) ||
-                (function_return_type instanceof BoolType && cur_return_type instanceof BoolType) ||
-                (function_return_type instanceof ListType && cur_return_type instanceof ListType) ||
-                (function_return_type instanceof FptrType && cur_return_type instanceof FptrType) ||
-                (function_return_type instanceof VoidType && cur_return_type instanceof VoidType) ||
-                (function_return_type instanceof NoType || cur_return_type instanceof NoType))){
+        // TODO error return type
+        if (function_return_type instanceof FptrType && cur_return_type instanceof FptrType) {
+            try {
+                FunctionSymbolTableItem left_funcSym = (FunctionSymbolTableItem) (SymbolTable.root.getItem(FunctionSymbolTableItem.START_KEY + ((FptrType) function_return_type).getFunctionName()));
+                FunctionSymbolTableItem right_funcSym = (FunctionSymbolTableItem) (SymbolTable.root.getItem(FunctionSymbolTableItem.START_KEY + ((FptrType) cur_return_type).getFunctionName()));
+                ArrayList<Type> left_types = (ArrayList<Type>) (left_funcSym.getArgTypes().clone());
+                left_types.add(left_funcSym.getReturnType());
+                ArrayList<Type> right_types = (ArrayList<Type>) (right_funcSym.getArgTypes().clone());
+                right_types.add(right_funcSym.getReturnType());
+                boolean flag = true;
+                if (left_types.size() == right_types.size()) {
+                    flag = false;
+                    for (int i = 0; i < left_types.size(); i++) {
+                        Type left_type = left_types.get(i);
+                        Type right_type = right_types.get(i);
+                        Type left_el_type = left_type;
+                        Type right_el_type = right_type;
+                        while (left_el_type instanceof ListType) {
+                            if (right_el_type instanceof ListType) {
+                                left_el_type = ((ListType) left_el_type).getType();
+                                right_el_type = ((ListType) right_el_type).getType();
+                            }
+                            else {
+                                flag = true;
+                                break;
+                            }
+                        }
+                        if ((left_el_type instanceof NoType || left_el_type == null || left_el_type instanceof IntType) && (right_el_type instanceof IntType || right_el_type instanceof NoType || right_el_type == null) ||
+                                (left_el_type instanceof NoType || left_el_type == null || left_el_type instanceof BoolType) && (right_el_type instanceof BoolType || right_el_type instanceof NoType || right_el_type == null) ||
+                                (left_el_type instanceof NoType || left_el_type == null || left_el_type instanceof StringType) && (right_el_type instanceof StringType || right_el_type instanceof NoType || right_el_type == null) ||
+                                (left_el_type instanceof NoType || left_el_type == null || left_el_type instanceof VoidType) && (right_el_type instanceof VoidType || right_el_type instanceof NoType || right_el_type == null) ||
+                                (left_el_type instanceof NoType || left_el_type == null || left_el_type instanceof FptrType) && (right_el_type instanceof FptrType || right_el_type instanceof NoType || right_el_type == null))
+                            continue;
+                        else {
+                            flag = true;
+                            break;
+                        }
+                    }
+                }
+                if(flag)
+                    returnStmt.addError(new ReturnValueNotMatchFunctionReturnType(returnStmt.getLine()));
+            }
+            catch (ItemNotFoundException e) { }
+        }
+
+        else if (function_return_type instanceof ListType && cur_return_type instanceof ListType){
+            boolean flag = false;
+            Type left_el_type = function_return_type;
+            Type right_el_type = cur_return_type;
+            while (left_el_type instanceof ListType){
+                if (right_el_type instanceof ListType) {
+                    left_el_type = ((ListType) left_el_type).getType();
+                    right_el_type = ((ListType) right_el_type).getType();
+                }
+                else
+                    flag = true;
+            }
+            if (!((left_el_type instanceof NoType || left_el_type instanceof IntType) && (right_el_type instanceof IntType || right_el_type instanceof NoType) ||
+                    (left_el_type instanceof NoType || left_el_type instanceof BoolType) && (right_el_type instanceof BoolType || right_el_type instanceof NoType) ||
+                    (left_el_type instanceof NoType || left_el_type instanceof StringType) && (right_el_type instanceof StringType || right_el_type instanceof NoType)))
+                flag = true;
+            if(flag)
+                returnStmt.addError(new ReturnValueNotMatchFunctionReturnType(returnStmt.getLine()));
+        }
+
+        else if(!((function_return_type instanceof NoType || function_return_type == null || function_return_type instanceof IntType) && (cur_return_type instanceof IntType || cur_return_type instanceof NoType || cur_return_type == null) ||
+                (function_return_type instanceof NoType || function_return_type == null || function_return_type instanceof BoolType) && (cur_return_type instanceof BoolType || cur_return_type instanceof NoType || cur_return_type == null) ||
+                (function_return_type instanceof NoType || function_return_type == null || function_return_type instanceof StringType) && (cur_return_type instanceof StringType || cur_return_type instanceof NoType || cur_return_type == null) ||
+                (function_return_type instanceof NoType || function_return_type == null || function_return_type instanceof VoidType) && (cur_return_type instanceof VoidType || cur_return_type instanceof NoType || cur_return_type == null) ||
+                (function_return_type instanceof NoType || function_return_type == null || function_return_type instanceof FptrType) && (cur_return_type instanceof FptrType || cur_return_type instanceof NoType || cur_return_type == null) ||
+                (function_return_type instanceof NoType || function_return_type == null || function_return_type instanceof ListType) && (cur_return_type instanceof ListType || cur_return_type instanceof NoType || cur_return_type == null))){
             returnStmt.addError(new ReturnValueNotMatchFunctionReturnType(returnStmt.getLine()));
         }
 

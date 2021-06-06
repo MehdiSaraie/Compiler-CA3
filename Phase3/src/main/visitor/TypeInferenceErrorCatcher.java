@@ -90,8 +90,7 @@ public class TypeInferenceErrorCatcher extends Visitor<Type> {
         }
 
         if (operator.equals(BinaryOperator.eq) || operator.equals(BinaryOperator.neq)){
-            if (tl instanceof IntType && tr instanceof IntType || tl instanceof BoolType && tr instanceof BoolType ||
-                    tl instanceof StringType && tr instanceof StringType || tl instanceof VoidType && tr instanceof VoidType)
+            if (tl instanceof IntType && tr instanceof IntType || tl instanceof BoolType && tr instanceof BoolType || tl instanceof StringType && tr instanceof StringType)
                 return new BoolType();
             if (tl instanceof FptrType && tr instanceof FptrType){
                 try {
@@ -139,8 +138,25 @@ public class TypeInferenceErrorCatcher extends Visitor<Type> {
                 }
 
             }
-            if (tl instanceof VoidType && tr instanceof FptrType || tr instanceof VoidType && tl instanceof FptrType)
-                return new BoolType();
+
+            if (tl instanceof VoidType){
+                binaryExpression.addError(new CantUseValueOfVoidFunction(binaryExpression.getLine()));
+                if (tr instanceof ListType) {
+                    binaryExpression.addError(new UnsupportedOperandType(binaryExpression.getLine(), operator.name()));
+                }
+                if (tr instanceof VoidType){
+                    binaryExpression.addError(new CantUseValueOfVoidFunction(binaryExpression.getLine()));
+                }
+                return new NoType();
+            }
+            if (tr instanceof VoidType){
+                if (tl instanceof ListType) {
+                    binaryExpression.addError(new UnsupportedOperandType(binaryExpression.getLine(), operator.name()));
+                }
+                binaryExpression.addError(new CantUseValueOfVoidFunction(binaryExpression.getLine()));
+                return new NoType();
+            }
+
             if (!(tl instanceof ListType) && tr instanceof NoType || !(tr instanceof ListType) && tl instanceof NoType)
                 return new NoType();
         }
@@ -274,17 +290,17 @@ public class TypeInferenceErrorCatcher extends Visitor<Type> {
         }
         if ((instance_type instanceof ListType || instance_type instanceof NoType) && (index_type instanceof IntType || index_type instanceof NoType))
             return new NoType();
-        if (instance_type instanceof VoidType){
-            listAccessByIndex.addError(new CantUseValueOfVoidFunction(listAccessByIndex.getLine()));
-        }
-        else if (!(instance_type instanceof NoType || instance_type instanceof ListType)){
-            listAccessByIndex.addError(new ListAccessByIndexOnNoneList(listAccessByIndex.getLine()));
-        }
         if (index_type instanceof VoidType){
             listAccessByIndex.addError(new CantUseValueOfVoidFunction(listAccessByIndex.getLine()));
         }
         else if (!(index_type instanceof NoType || index_type instanceof IntType)){
             listAccessByIndex.addError(new ListIndexNotInt(listAccessByIndex.getLine()));
+        }
+        if (instance_type instanceof VoidType){
+            listAccessByIndex.addError(new CantUseValueOfVoidFunction(listAccessByIndex.getLine()));
+        }
+        else if (!(instance_type instanceof NoType || instance_type instanceof ListType)){
+            listAccessByIndex.addError(new ListAccessByIndexOnNoneList(listAccessByIndex.getLine()));
         }
         return new NoType();
     }
@@ -344,10 +360,6 @@ public class TypeInferenceErrorCatcher extends Visitor<Type> {
                 functionDeclaration.accept(typeSetterErrorCatcher);
             }
             Type return_type = functionSymbolTableItem.getReturnType();
-            if (return_type instanceof VoidType) {
-                funcCall.addError(new CantUseValueOfVoidFunction(funcCall.getLine()));
-                return new NoType();
-            }
             if (return_type == null)
                 return_type = new NoType();
             return return_type;

@@ -93,9 +93,8 @@ public class TypeInference extends Visitor<Type> {
             }
         }
 
-        if (operator.equals(BinaryOperator.eq) || operator.equals(BinaryOperator.neq)){ //is two voids valid?
-            if (tl instanceof IntType && tr instanceof IntType || tl instanceof BoolType && tr instanceof BoolType ||
-                    tl instanceof StringType && tr instanceof StringType || tl instanceof VoidType && tr instanceof VoidType)
+        if (operator.equals(BinaryOperator.eq) || operator.equals(BinaryOperator.neq)){
+            if (tl instanceof IntType && tr instanceof IntType || tl instanceof BoolType && tr instanceof BoolType || tl instanceof StringType && tr instanceof StringType)
                 return new BoolType();
             if (tl instanceof FptrType && tr instanceof FptrType){
                 try {
@@ -143,8 +142,25 @@ public class TypeInference extends Visitor<Type> {
                 }
 
             }
-            if (tl instanceof VoidType && tr instanceof FptrType || tr instanceof VoidType && tl instanceof FptrType)
-                return new BoolType();
+
+            if (tl instanceof VoidType){
+                //void error
+                if (tr instanceof ListType) {
+                    //unsupported operand error
+                }
+                if (tr instanceof VoidType){
+                    //void error
+                }
+                return new NoType();
+            }
+            if (tr instanceof VoidType){
+                if (tl instanceof ListType) {
+                    //unsupported operand error
+                }
+                //void error
+                return new NoType();
+            }
+
             if (!(tl instanceof ListType) && tr instanceof NoType || !(tr instanceof ListType) && tl instanceof NoType)
                 return new NoType();
         }
@@ -278,17 +294,17 @@ public class TypeInference extends Visitor<Type> {
         }
         if ((instance_type instanceof ListType || instance_type instanceof NoType) && (index_type instanceof IntType || index_type instanceof NoType))
             return new NoType();
-        if (instance_type instanceof VoidType){
-            //void error
-        }
-        else if (!(instance_type instanceof NoType || instance_type instanceof ListType)){
-            //access on non list
-        }
         if (index_type instanceof VoidType){
             //void error
         }
         else if (!(index_type instanceof NoType || index_type instanceof IntType)){
             //index not integer
+        }
+        if (instance_type instanceof VoidType){
+            //void error
+        }
+        else if (!(instance_type instanceof NoType || instance_type instanceof ListType)){
+            //access on non list
         }
         return new NoType();
     }
@@ -336,7 +352,6 @@ public class TypeInference extends Visitor<Type> {
                 }
                 else {
                     arg_type = args.get(arg_index).accept(this);
-                    //Type func_arg_type = functionSymbolTableItem.getArgTypes().get(arg_index);
                     //TODO Check function argument type (optional)
                 }
                 if(!TypeSetter.visited_function_name.contains(functionDeclaration.getFunctionName().getName())) {
@@ -355,10 +370,6 @@ public class TypeInference extends Visitor<Type> {
                 functionDeclaration.accept(typeSetter);
             }
             Type return_type = functionSymbolTableItem.getReturnType();
-            if (return_type instanceof VoidType) {
-                //void error
-                return new NoType();
-            }
             if (return_type == null)
                 return_type = new NoType();
             return return_type;

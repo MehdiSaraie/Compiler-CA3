@@ -13,6 +13,7 @@ import main.ast.types.list.ListType;
 import main.ast.types.single.BoolType;
 import main.ast.types.single.IntType;
 import main.ast.types.single.StringType;
+import main.compileErrors.typeErrors.CantUseValueOfVoidFunction;
 import main.compileErrors.typeErrors.ConditionNotBool;
 import main.compileErrors.typeErrors.ReturnValueNotMatchFunctionReturnType;
 import main.compileErrors.typeErrors.UnsupportedTypeForPrint;
@@ -108,7 +109,10 @@ public class TypeSetter  extends Visitor<Void> {
     @Override
     public Void visit(ConditionalStmt conditionalStmt) {
         Type cond_type = conditionalStmt.getCondition().accept(typeInference);
-        if (!(cond_type instanceof BoolType || cond_type instanceof NoType)){
+        if (cond_type instanceof VoidType){
+            //void error
+        }
+        else if (!(cond_type instanceof BoolType || cond_type instanceof NoType)){
             //if error
         }
         conditionalStmt.getThenBody().accept(this);
@@ -127,7 +131,10 @@ public class TypeSetter  extends Visitor<Void> {
     @Override
     public Void visit(PrintStmt print) {
         Type arg_type = print.getArg().accept(typeInference);
-        if (arg_type instanceof FptrType || arg_type instanceof VoidType){
+        if (arg_type instanceof VoidType){
+            //void error
+        }
+        if (arg_type instanceof FptrType){
             //print error
         }
         return null;
@@ -135,16 +142,16 @@ public class TypeSetter  extends Visitor<Void> {
 
     @Override
     public Void visit(ReturnStmt returnStmt) {
-        Type cur_return_type = returnStmt.getReturnedExpr().accept(typeInference);
+        Expression returned_expression = returnStmt.getReturnedExpr();
+        Type cur_return_type = returned_expression.accept(typeInference);
         FunctionSymbolTableItem cur_func = TypeSetter.func_stack.pop();
         TypeSetter.func_stack.push(cur_func);
         Type function_return_type = cur_func.getReturnType();
 
-        if(function_return_type == null || function_return_type instanceof NoType){
+        if((function_return_type == null || function_return_type instanceof NoType) && (!(cur_return_type instanceof VoidType) || returned_expression instanceof VoidValue)){
             cur_func.setReturnType(cur_return_type);
         }
         // TODO error return type
-
         return null;
     }
 }
