@@ -120,11 +120,11 @@ public class TypeInference extends Visitor<Type> {
                                     break;
                                 }
                             }
-                            if ((left_el_type instanceof NoType || left_el_type instanceof IntType) && (right_el_type instanceof IntType || right_el_type instanceof NoType) ||
-                                    (left_el_type instanceof NoType || left_el_type instanceof BoolType) && (right_el_type instanceof BoolType || right_el_type instanceof NoType) ||
-                                    (left_el_type instanceof NoType || left_el_type instanceof StringType) && (right_el_type instanceof StringType || right_el_type instanceof NoType) ||
-                                    (left_el_type instanceof NoType || left_el_type instanceof VoidType) && (right_el_type instanceof VoidType || right_el_type instanceof NoType) ||
-                                    (left_el_type instanceof NoType || left_el_type instanceof FptrType) && (right_el_type instanceof FptrType || right_el_type instanceof NoType))
+                            if ((left_el_type instanceof NoType || left_el_type == null || left_el_type instanceof IntType) && (right_el_type instanceof IntType || right_el_type instanceof NoType || right_el_type == null) ||
+                                    (left_el_type instanceof NoType || left_el_type == null || left_el_type instanceof BoolType) && (right_el_type instanceof BoolType || right_el_type instanceof NoType || right_el_type == null) ||
+                                    (left_el_type instanceof NoType || left_el_type == null || left_el_type instanceof StringType) && (right_el_type instanceof StringType || right_el_type instanceof NoType || right_el_type == null) ||
+                                    (left_el_type instanceof NoType || left_el_type == null || left_el_type instanceof VoidType) && (right_el_type instanceof VoidType || right_el_type instanceof NoType || right_el_type == null) ||
+                                    (left_el_type instanceof NoType || left_el_type == null || left_el_type instanceof FptrType) && (right_el_type instanceof FptrType || right_el_type instanceof NoType || right_el_type == null))
                                 continue;
                             else{
                                 flag = true;
@@ -311,6 +311,8 @@ public class TypeInference extends Visitor<Type> {
         Expression instance = funcCall.getInstance();
         ArrayList<Expression> args = funcCall.getArgs();
         FptrType fptr = (FptrType)instance.accept(this);
+
+        System.out.println(fptr.getFunctionName());
         try{
             FunctionSymbolTableItem functionSymbolTableItem = (FunctionSymbolTableItem)(SymbolTable.root.getItem(FunctionSymbolTableItem.START_KEY + fptr.getFunctionName()));
             FunctionDeclaration functionDeclaration = functionSymbolTableItem.getFuncDeclaration();
@@ -323,6 +325,7 @@ public class TypeInference extends Visitor<Type> {
                     for (Map.Entry<Identifier, Expression> arg_with_key : funcCall.getArgsWithKey().entrySet()) {
                         if (arg_with_key.getKey().getName().equals(arg.getName())) {
                             arg_type = arg_with_key.getValue().accept(this);
+                            System.out.println(arg.getName() + " - " + arg_type.toString());
                             //TODO Check function argument type (optional)
                             break;
                         }
@@ -330,6 +333,7 @@ public class TypeInference extends Visitor<Type> {
                 }
                 else {
                     arg_type = args.get(arg_index).accept(this);
+                    System.out.println(arg.getName() + " - " + arg_type.toString());
                     //Type func_arg_type = functionSymbolTableItem.getArgTypes().get(arg_index);
                     //TODO Check function argument type (optional)
                 }
@@ -350,7 +354,9 @@ public class TypeInference extends Visitor<Type> {
                 TypeSetter.visited_function_declaration.add(functionDeclaration);
                 functionDeclaration.accept(typeSetter);
             }
-
+            System.out.println("Return = " + functionSymbolTableItem.getReturnType());
+            if(functionSymbolTableItem.getReturnType() == null)
+                return new NoType();
             return functionSymbolTableItem.getReturnType();
         }
         catch (ItemNotFoundException e){}

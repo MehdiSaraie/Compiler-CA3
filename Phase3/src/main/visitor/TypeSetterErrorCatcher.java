@@ -8,7 +8,10 @@ import main.ast.nodes.expression.values.primitive.*;
 import main.ast.nodes.statement.*;
 import main.ast.types.*;
 import main.ast.types.functionPointer.FptrType;
+import main.ast.types.list.ListType;
 import main.ast.types.single.BoolType;
+import main.ast.types.single.IntType;
+import main.ast.types.single.StringType;
 import main.compileErrors.typeErrors.CantUseValueOfVoidFunction;
 import main.compileErrors.typeErrors.ConditionNotBool;
 import main.compileErrors.typeErrors.ReturnValueNotMatchFunctionReturnType;
@@ -40,7 +43,6 @@ public class TypeSetterErrorCatcher  extends Visitor<Void> {
     @Override
     public Void visit(FunctionDeclaration funcDeclaration) {
         try {
-            //System.out.println("funcDec"+funcDeclaration.getFunctionName().getName());
             FunctionSymbolTableItem functionSymbolTableItem = (FunctionSymbolTableItem) (SymbolTable.root.getItem(FunctionSymbolTableItem.START_KEY + funcDeclaration.getFunctionName().getName()));
             TypeSetterErrorCatcher.func_stack.push(functionSymbolTableItem);
             funcDeclaration.getBody().accept(this);
@@ -101,10 +103,21 @@ public class TypeSetterErrorCatcher  extends Visitor<Void> {
         TypeSetterErrorCatcher.func_stack.push(cur_func);
         Type function_return_type = cur_func.getReturnType();
 
-        if(function_return_type == null || function_return_type instanceof NoType){
-            cur_func.setReturnType(cur_return_type);
-        }
+//        if(function_return_type == null || function_return_type instanceof NoType){
+//            cur_func.setReturnType(cur_return_type);
+//        }
         // TODO error return type
+
+        // TODO fptr and list
+        if(!((function_return_type instanceof IntType && cur_return_type instanceof IntType) ||
+                (function_return_type instanceof StringType && cur_return_type instanceof StringType) ||
+                (function_return_type instanceof BoolType && cur_return_type instanceof BoolType) ||
+                (function_return_type instanceof ListType && cur_return_type instanceof ListType) ||
+                (function_return_type instanceof FptrType && cur_return_type instanceof FptrType) ||
+                (function_return_type instanceof VoidType && cur_return_type instanceof VoidType) ||
+                (function_return_type instanceof NoType || cur_return_type instanceof NoType))){
+            returnStmt.addError(new ReturnValueNotMatchFunctionReturnType(returnStmt.getLine()));
+        }
 
         return null;
     }

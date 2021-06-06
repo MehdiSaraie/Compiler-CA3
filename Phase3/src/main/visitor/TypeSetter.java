@@ -9,7 +9,10 @@ import main.ast.nodes.expression.values.primitive.*;
 import main.ast.nodes.statement.*;
 import main.ast.types.*;
 import main.ast.types.functionPointer.FptrType;
+import main.ast.types.list.ListType;
 import main.ast.types.single.BoolType;
+import main.ast.types.single.IntType;
+import main.ast.types.single.StringType;
 import main.compileErrors.typeErrors.ConditionNotBool;
 import main.compileErrors.typeErrors.ReturnValueNotMatchFunctionReturnType;
 import main.compileErrors.typeErrors.UnsupportedTypeForPrint;
@@ -31,9 +34,25 @@ public class TypeSetter  extends Visitor<Void> {
         this.typeInference = _type_inference;
     }
 
+    public void set_function_return_type(){
+        for(FunctionDeclaration func : visited_function_declaration) {
+            try {
+                FunctionSymbolTableItem func_symbol_table = (FunctionSymbolTableItem) (SymbolTable.root.getItem(FunctionSymbolTableItem.START_KEY + func.getFunctionName().getName()));
+                if(func_symbol_table.getReturnType() == null || func_symbol_table.getReturnType() instanceof NoType){
+                    func.accept(this);
+                }
+                if(func_symbol_table.getReturnType() == null || func_symbol_table.getReturnType() instanceof NoType){
+                    func_symbol_table.setReturnType(new NoType());
+                }
+            }catch(ItemNotFoundException e){}
+        }
+    }
+
     @Override
     public Void visit(Program program) {
         program.getMain().accept(this);
+
+        set_function_return_type();
 
         for(FunctionDeclaration func : program.getFunctions()){
             String function_name = func.getFunctionName().getName();
@@ -65,7 +84,6 @@ public class TypeSetter  extends Visitor<Void> {
     @Override
     public Void visit(FunctionDeclaration funcDeclaration) {
         try {
-            //System.out.println("funcDec"+funcDeclaration.getFunctionName().getName());
             FunctionSymbolTableItem functionSymbolTableItem = (FunctionSymbolTableItem) (SymbolTable.root.getItem(FunctionSymbolTableItem.START_KEY + funcDeclaration.getFunctionName().getName()));
             TypeSetter.func_stack.push(functionSymbolTableItem);
             funcDeclaration.getBody().accept(this);
@@ -121,6 +139,9 @@ public class TypeSetter  extends Visitor<Void> {
         FunctionSymbolTableItem cur_func = TypeSetter.func_stack.pop();
         TypeSetter.func_stack.push(cur_func);
         Type function_return_type = cur_func.getReturnType();
+
+        //System.out.println(returnStmt.getReturnedExpr().getClass());
+        //System.out.println("Cur Return = " + cur_return_type.toString());
 
         if(function_return_type == null || function_return_type instanceof NoType){
             cur_func.setReturnType(cur_return_type);

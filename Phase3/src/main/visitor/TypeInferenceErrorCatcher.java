@@ -121,11 +121,11 @@ public class TypeInferenceErrorCatcher extends Visitor<Type> {
                                     break;
                                 }
                             }
-                            if ((left_el_type instanceof NoType || left_el_type instanceof IntType) && (right_el_type instanceof IntType || right_el_type instanceof NoType) ||
-                                    (left_el_type instanceof NoType || left_el_type instanceof BoolType) && (right_el_type instanceof BoolType || right_el_type instanceof NoType) ||
-                                    (left_el_type instanceof NoType || left_el_type instanceof StringType) && (right_el_type instanceof StringType || right_el_type instanceof NoType) ||
-                                    (left_el_type instanceof NoType || left_el_type instanceof VoidType) && (right_el_type instanceof VoidType || right_el_type instanceof NoType) ||
-                                    (left_el_type instanceof NoType || left_el_type instanceof FptrType) && (right_el_type instanceof FptrType || right_el_type instanceof NoType))
+                            if ((left_el_type instanceof NoType || left_el_type == null || left_el_type instanceof IntType) && (right_el_type instanceof IntType || right_el_type instanceof NoType || right_el_type == null) ||
+                                    (left_el_type instanceof NoType || left_el_type == null || left_el_type instanceof BoolType) && (right_el_type instanceof BoolType || right_el_type instanceof NoType || right_el_type == null) ||
+                                    (left_el_type instanceof NoType || left_el_type == null || left_el_type instanceof StringType) && (right_el_type instanceof StringType || right_el_type instanceof NoType || right_el_type == null) ||
+                                    (left_el_type instanceof NoType || left_el_type == null || left_el_type instanceof VoidType) && (right_el_type instanceof VoidType || right_el_type instanceof NoType || right_el_type == null) ||
+                                    (left_el_type instanceof NoType || left_el_type == null || left_el_type instanceof FptrType) && (right_el_type instanceof FptrType || right_el_type instanceof NoType || right_el_type == null))
                                 continue;
                             else{
                                 flag = true;
@@ -312,6 +312,14 @@ public class TypeInferenceErrorCatcher extends Visitor<Type> {
         //TODO
         Expression instance = funcCall.getInstance();
         ArrayList<Expression> args = funcCall.getArgs();
+
+        Type fptr2 = instance.accept(this);
+
+        if(!(fptr2 instanceof FptrType)){
+            System.out.println("Line" + funcCall.getLine());
+            return new NoType();
+        }
+
         FptrType fptr = (FptrType)instance.accept(this);
         try{
             FunctionSymbolTableItem functionSymbolTableItem = (FunctionSymbolTableItem)(SymbolTable.root.getItem(FunctionSymbolTableItem.START_KEY + fptr.getFunctionName()));
@@ -346,6 +354,8 @@ public class TypeInferenceErrorCatcher extends Visitor<Type> {
                 functionDeclaration.accept(typeSetterErrorCatcher);
             }
 
+            if(functionSymbolTableItem.getReturnType() == null)
+                return new NoType();
             return functionSymbolTableItem.getReturnType();
         }
         catch (ItemNotFoundException e){}
