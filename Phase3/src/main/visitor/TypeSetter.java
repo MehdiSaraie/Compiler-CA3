@@ -65,6 +65,7 @@ public class TypeSetter  extends Visitor<Void> {
     @Override
     public Void visit(FunctionDeclaration funcDeclaration) {
         try {
+            //System.out.println("funcDec"+funcDeclaration.getFunctionName().getName());
             FunctionSymbolTableItem functionSymbolTableItem = (FunctionSymbolTableItem) (SymbolTable.root.getItem(FunctionSymbolTableItem.START_KEY + funcDeclaration.getFunctionName().getName()));
             TypeSetter.func_stack.push(functionSymbolTableItem);
             funcDeclaration.getBody().accept(this);

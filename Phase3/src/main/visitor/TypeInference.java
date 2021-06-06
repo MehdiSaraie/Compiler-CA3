@@ -276,13 +276,13 @@ public class TypeInference extends Visitor<Type> {
         if (instance_type instanceof VoidType){
             //void error
         }
-        else{
+        else if (!(instance_type instanceof NoType)){
             //instance error
         }
         if (index_type instanceof VoidType){
             //void error
         }
-        else{
+        else if (!(index_type instanceof NoType)){
             //index error
         }
         return new NoType();
@@ -315,35 +315,36 @@ public class TypeInference extends Visitor<Type> {
             FunctionSymbolTableItem functionSymbolTableItem = (FunctionSymbolTableItem)(SymbolTable.root.getItem(FunctionSymbolTableItem.START_KEY + fptr.getFunctionName()));
             FunctionDeclaration functionDeclaration = functionSymbolTableItem.getFuncDeclaration();
             SymbolTable function_symbol_table = functionSymbolTableItem.getFunctionSymbolTable();
+
             Type arg_type = new NoType();
             int arg_index = 0;
-
-            if(!TypeSetter.visited_function_name.contains(functionDeclaration.getFunctionName().getName())){
-                for (Identifier arg : functionDeclaration.getArgs()) {
-                    if (args.isEmpty()) {
-                        for (Map.Entry<Identifier, Expression> arg_with_key : funcCall.getArgsWithKey().entrySet()) {
-                            if (arg_with_key.getKey().getName().equals(arg.getName())) {
-                                arg_type = arg_with_key.getValue().accept(this);
-                                break;
-                            }
+            for (Identifier arg : functionDeclaration.getArgs()) {
+                if (args.isEmpty()) {
+                    for (Map.Entry<Identifier, Expression> arg_with_key : funcCall.getArgsWithKey().entrySet()) {
+                        if (arg_with_key.getKey().getName().equals(arg.getName())) {
+                            arg_type = arg_with_key.getValue().accept(this);
+                            //TODO Check function argument type (optional)
+                            break;
                         }
-                    } else
-                        arg_type = args.get(arg_index).accept(this);
-
-                    if(!TypeSetter.visited_function_name.contains(functionDeclaration.getFunctionName().getName())) {
-                        functionSymbolTableItem.addArgType(arg_type);
-
-                        // TODO set variables
-                        VariableSymbolTableItem var_symbol_table = (VariableSymbolTableItem) (function_symbol_table.getItem("Var_" + arg.getName()));
-                        var_symbol_table.setType(arg_type);
-                        arg_index++;
                     }
-                    else
-                        break;
                 }
+                else {
+                    arg_type = args.get(arg_index).accept(this);
+                    //Type func_arg_type = functionSymbolTableItem.getArgTypes().get(arg_index);
+                    //TODO Check function argument type (optional)
+                }
+                if(!TypeSetter.visited_function_name.contains(functionDeclaration.getFunctionName().getName())) {
+                    functionSymbolTableItem.addArgType(arg_type);
+                    // TODO set variables
+                    VariableSymbolTableItem var_symbol_table = (VariableSymbolTableItem) (function_symbol_table.getItem("Var_" + arg.getName()));
+                    var_symbol_table.setType(arg_type);
+                }
+                arg_index++;
             }
 
             //TODO check for loop
+//            System.out.println(functionDeclaration.getFunctionName().getName());
+//            System.out.println(TypeSetter.visited_function_name);
             if(!TypeSetter.visited_function_name.contains(functionDeclaration.getFunctionName().getName())){
                 TypeSetter.visited_function_name.add(functionDeclaration.getFunctionName().getName());
                 TypeSetter.visited_function_declaration.add(functionDeclaration);

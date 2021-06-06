@@ -32,6 +32,11 @@ public class TypeInferenceErrorCatcher extends Visitor<Type> {
         Type tr = right.accept(this);
         BinaryOperator operator =  binaryExpression.getBinaryOperator();
 
+        /*System.out.println(tl.getClass());
+        System.out.println(tr.getClass());
+        System.out.println(operator.name());
+        System.out.println(this.getClass());*/
+
         if (operator.equals(BinaryOperator.and) || operator.equals(BinaryOperator.or)){
             if (tl instanceof BoolType && tr instanceof BoolType)
                 return new BoolType();
@@ -273,13 +278,13 @@ public class TypeInferenceErrorCatcher extends Visitor<Type> {
         if (instance_type instanceof VoidType){
             listAccessByIndex.addError(new CantUseValueOfVoidFunction(listAccessByIndex.getLine()));
         }
-        else{
+        else if (!(instance_type instanceof NoType)){
             listAccessByIndex.addError(new ListAccessByIndexOnNoneList(listAccessByIndex.getLine()));
         }
         if (index_type instanceof VoidType){
             listAccessByIndex.addError(new CantUseValueOfVoidFunction(listAccessByIndex.getLine()));
         }
-        else{
+        else if (!(index_type instanceof NoType)){
             listAccessByIndex.addError(new ListIndexNotInt(listAccessByIndex.getLine()));
         }
         return new NoType();
@@ -323,14 +328,18 @@ public class TypeInferenceErrorCatcher extends Visitor<Type> {
                             break;
                         }
                     }
-                } else {
+                }
+                else {
                     arg_type = args.get(arg_index).accept(this);
                     Type func_arg_type = functionSymbolTableItem.getArgTypes().get(arg_index);
                     //TODO Check function argument type (optional)
                 }
+                arg_index++;
             }
 
             //TODO check for loop
+//            System.out.println(functionDeclaration.getFunctionName().getName());
+//            System.out.println(TypeSetterErrorCatcher.visited_function_name);
             if(!TypeSetterErrorCatcher.visited_function_name.contains(functionDeclaration.getFunctionName().getName())){
                 TypeSetterErrorCatcher.visited_function_name.add(functionDeclaration.getFunctionName().getName());
                 TypeSetterErrorCatcher.visited_function_declaration.add(functionDeclaration);
