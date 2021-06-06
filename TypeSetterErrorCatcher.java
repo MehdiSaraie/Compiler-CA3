@@ -24,7 +24,7 @@ public class TypeSetterErrorCatcher  extends Visitor<Void> {
     public static ArrayList<String> visited_function_name = new ArrayList<>();
     public static ArrayList<FunctionDeclaration> visited_function_declaration = new ArrayList<>();
 
-    private TypeInference typeInference = new TypeInference();
+    private TypeInferenceErrorCatcher typeInferenceErrorCatcher = new TypeInferenceErrorCatcher();
     @Override
     public Void visit(Program program) {
         program.getMain().accept(this);
@@ -39,7 +39,6 @@ public class TypeSetterErrorCatcher  extends Visitor<Void> {
             funcDeclaration.getBody().accept(this);
             TypeSetter.func_stack.pop();
         }catch (ItemNotFoundException e){}
-
         return null;
     }
 
@@ -58,7 +57,7 @@ public class TypeSetterErrorCatcher  extends Visitor<Void> {
 
     @Override
     public Void visit(ConditionalStmt conditionalStmt) {
-        Type cond_type = conditionalStmt.getCondition().accept(typeInference);
+        Type cond_type = conditionalStmt.getCondition().accept(typeInferenceErrorCatcher);
         if (!(cond_type instanceof BoolType || cond_type instanceof NoType)){
             conditionalStmt.addError(new ConditionNotBool(conditionalStmt.getLine()));
         }
@@ -71,13 +70,13 @@ public class TypeSetterErrorCatcher  extends Visitor<Void> {
 
     @Override
     public Void visit(FunctionCallStmt funcCallStmt) {
-        funcCallStmt.getFunctionCall().accept(typeInference);
+        funcCallStmt.getFunctionCall().accept(typeInferenceErrorCatcher);
         return null;
     }
 
     @Override
     public Void visit(PrintStmt print) {
-        Type arg_type = print.getArg().accept(typeInference);
+        Type arg_type = print.getArg().accept(typeInferenceErrorCatcher);
         if (arg_type instanceof FptrType || arg_type instanceof VoidType){
             print.addError(new UnsupportedTypeForPrint(print.getLine()));
         }
@@ -86,17 +85,15 @@ public class TypeSetterErrorCatcher  extends Visitor<Void> {
 
     @Override
     public Void visit(ReturnStmt returnStmt) {
-        Type cur_return_type = returnStmt.getReturnedExpr().accept(typeInference);
-
+        Type cur_return_type = returnStmt.getReturnedExpr().accept(typeInferenceErrorCatcher);
         FunctionSymbolTableItem cur_func = TypeSetter.func_stack.pop();
+        TypeSetter.func_stack.push(cur_func);
         Type function_return_type = cur_func.getReturnType();
 
         if(function_return_type == null || function_return_type instanceof NoType){
             cur_func.setReturnType(cur_return_type);
         }
         // TODO error return type
-
-        TypeSetter.func_stack.push(cur_func);
 
         return null;
     }

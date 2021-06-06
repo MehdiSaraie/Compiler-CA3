@@ -17,7 +17,7 @@ import main.symbolTable.items.*;
 import java.util.*;
 
 public class TypeInferenceErrorCatcher extends Visitor<Type> {
-    private TypeSetter typeSetter = new TypeSetter();
+    private TypeSetterErrorCatcher typeSetterErrorCatcher = new TypeSetterErrorCatcher();
     @Override
     public Type visit(BinaryExpression binaryExpression) {
         Expression left = binaryExpression.getFirstOperand();
@@ -226,14 +226,20 @@ public class TypeInferenceErrorCatcher extends Visitor<Type> {
 
     @Override
     public Type visit(Identifier identifier) {
-        FunctionSymbolTableItem cur_func = TypeSetter.func_stack.pop();
-
-        SymbolTable function_symbol_table = cur_func.getFunctionSymbolTable();
         try {
-            VariableSymbolTableItem var_symbol_table = (VariableSymbolTableItem) function_symbol_table.getItem("Var_" + identifier.getName());
-            return var_symbol_table.getType();
-        }catch(ItemNotFoundException e){}
-
+            FunctionSymbolTableItem functionSymbolTableItem = (FunctionSymbolTableItem) (SymbolTable.root.getItem(FunctionSymbolTableItem.START_KEY + identifier.getName()));
+            return new FptrType(identifier.getName());
+        }
+        catch(ItemNotFoundException e1){
+            FunctionSymbolTableItem cur_func = TypeSetter.func_stack.pop();
+            TypeSetter.func_stack.push(cur_func);
+            SymbolTable function_symbol_table = cur_func.getFunctionSymbolTable();
+            try {
+                VariableSymbolTableItem var_symbol_table = (VariableSymbolTableItem) function_symbol_table.getItem("Var_" + identifier.getName());
+                return var_symbol_table.getType();
+            }
+            catch(ItemNotFoundException e2){}
+        }
         return new NoType();
     }
 
@@ -296,44 +302,42 @@ public class TypeInferenceErrorCatcher extends Visitor<Type> {
         //TODO
         Expression instance = funcCall.getInstance();
         ArrayList<Expression> args = funcCall.getArgs();
-        Map<Identifier, Expression> argsWithKey = funcCall.getArgsWithKey();
         FptrType fptr = (FptrType)instance.accept(this);
         try{
             FunctionSymbolTableItem functionSymbolTableItem = (FunctionSymbolTableItem)(SymbolTable.root.getItem(FunctionSymbolTableItem.START_KEY + fptr.getFunctionName()));
             FunctionDeclaration functionDeclaration = functionSymbolTableItem.getFuncDeclaration();
-            Type arg_type;
+            SymbolTable function_symbol_table = functionSymbolTableItem.getFunctionSymbolTable();
+            Type arg_type = new NoType();
             int arg_index = 0;
-            for (Expression arg: args){
-                arg_type = arg.accept(this);
+            for (Identifier arg : functionDeclaration.getArgs()){
+                if (args.isEmpty()) {
+                    for (Map.Entry<Identifier,Expression> arg_with_key: funcCall.getArgsWithKey().entrySet()){
+                        if (arg_with_key.getKey().getName() == arg.getName()){
+                            arg_type = arg_with_key.getValue().accept(this);
+                            break;
+                        }
+                    }
+                }
+                else
+                    arg_type = args.get(arg_index).accept(this);
                 functionSymbolTableItem.addArgType(arg_type);
 
                 // TODO set variables
-                SymbolTable function_symbol_table = functionSymbolTableItem.getFunctionSymbolTable();
-                Identifier arg_name = functionDeclaration.getArgs().get(arg_index);
-                VariableSymbolTableItem var_symbol_table = (VariableSymbolTableItem)function_symbol_table.getItem("Var_" + arg_name);
+                VariableSymbolTableItem var_symbol_table = (VariableSymbolTableItem)(function_symbol_table.getItem("Var_" + arg.getName()));
                 var_symbol_table.setType(arg_type);
-            }
-            for (Identifier arg_name : functionDeclaration.getArgs()){
-                arg_type = argsWithKey.get(arg_name).accept(this);
-                functionSymbolTableItem.addArgType(arg_type);
-
-                // TODO set variable
-                SymbolTable function_symbol_table = functionSymbolTableItem.getFunctionSymbolTable();
-                VariableSymbolTableItem var_symbol_table = (VariableSymbolTableItem)function_symbol_table.getItem("Var_" + arg_name);
-                var_symbol_table.setType(arg_type);
+                arg_index++;
             }
 
             //TODO check for loop
             if(!TypeSetter.visited_function_name.contains(functionDeclaration.getFunctionName().getName())){
                 TypeSetter.visited_function_name.add(functionDeclaration.getFunctionName().getName());
                 TypeSetter.visited_function_declaration.add(functionDeclaration);
-                functionDeclaration.accept(typeSetter);
+                functionDeclaration.accept(typeSetterErrorCatcher);
             }
 
             return functionSymbolTableItem.getReturnType();
         }
-        catch (ItemNotFoundException e){
-        }
+        catch (ItemNotFoundException e){}
 
         return new NoType();
     }

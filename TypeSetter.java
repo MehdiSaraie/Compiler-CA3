@@ -20,7 +20,7 @@ import main.symbolTable.utils.Stack;
 import java.util.*;
 
 public class TypeSetter  extends Visitor<Void> {
-    public static main.symbolTable.utils.Stack<FunctionSymbolTableItem> func_stack = new Stack<>();
+    public static Stack<FunctionSymbolTableItem> func_stack = new Stack<>();
     public static ArrayList<String> visited_function_name = new ArrayList<>();
     public static ArrayList<FunctionDeclaration> visited_function_declaration = new ArrayList<>();
 
@@ -39,7 +39,6 @@ public class TypeSetter  extends Visitor<Void> {
             funcDeclaration.getBody().accept(this);
             TypeSetter.func_stack.pop();
         }catch (ItemNotFoundException e){}
-
         return null;
     }
 
@@ -87,16 +86,14 @@ public class TypeSetter  extends Visitor<Void> {
     @Override
     public Void visit(ReturnStmt returnStmt) {
         Type cur_return_type = returnStmt.getReturnedExpr().accept(typeInference);
-
         FunctionSymbolTableItem cur_func = TypeSetter.func_stack.pop();
+        TypeSetter.func_stack.push(cur_func);
         Type function_return_type = cur_func.getReturnType();
 
         if(function_return_type == null || function_return_type instanceof NoType){
             cur_func.setReturnType(cur_return_type);
         }
         // TODO error return type
-
-        TypeSetter.func_stack.push(cur_func);
 
         return null;
     }
