@@ -1,37 +1,28 @@
-func A(arg) : {
-    return B(arg :: []);
+main : start(start(1));
+
+func start(arg1) : {
+    f(arg1);
+    return arg1;
 }
 
-func B(a) : {
-    return A([]);
+func f(arg1) : {
+    if (arg1) :
+        return g;
+    else : {
+        if (arg1 * true + arg1 > 10) :
+            k(arg1 , arg1, true);
+        return arg1;
+    }
+
 }
 
-func pointer() : {
-    return [[], "str"];
+func g(a, b) : {
+    if(a) :
+        return a;
+    return b.size;
 }
 
-main : f1(b = [], c = []::(true *2) :: true, a = pointer is pointer);
-
-func f1(a, b, c) : {
-    A([c]);
-    return f2();
-    return (b, a) -> {return b[b]; return a;} (a, b);
-    A(f1(1 + "str" - 2 * false + "s" / 2, [1, 2, 3] is [], ([].size).size));
-    self(self(self));
+func k(a, b, c) : {
+    return f(a)(b, c);
+    return [1, "str", c][~c];
 }
-
-func f2() : {
-    if([[true, false]][0]) :
-        return void;
-    else :
-        return [[[1, 2, 3]]] :: [[3, 4]] :: [1];
-    return [[1, 2], [[2, 3]]] :: 2 :: true;
-}
-
-func self(arg) : {
-    return self;
-    return self is f2();
-    return self is B;
-    return A;
-}
-
