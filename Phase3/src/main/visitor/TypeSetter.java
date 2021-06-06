@@ -140,9 +140,6 @@ public class TypeSetter  extends Visitor<Void> {
         TypeSetter.func_stack.push(cur_func);
         Type function_return_type = cur_func.getReturnType();
 
-        //System.out.println(returnStmt.getReturnedExpr().getClass());
-        //System.out.println("Cur Return = " + cur_return_type.toString());
-
         if(function_return_type == null || function_return_type instanceof NoType){
             cur_func.setReturnType(cur_return_type);
         }

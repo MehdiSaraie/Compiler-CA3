@@ -32,11 +32,6 @@ public class TypeInferenceErrorCatcher extends Visitor<Type> {
         Type tr = right.accept(this);
         BinaryOperator operator =  binaryExpression.getBinaryOperator();
 
-        /*System.out.println(tl.getClass());
-        System.out.println(tr.getClass());
-        System.out.println(operator.name());
-        System.out.println(this.getClass());*/
-
         if (operator.equals(BinaryOperator.and) || operator.equals(BinaryOperator.or)){
             if (tl instanceof BoolType && tr instanceof BoolType)
                 return new BoolType();
@@ -67,7 +62,10 @@ public class TypeInferenceErrorCatcher extends Visitor<Type> {
         if (operator.equals(BinaryOperator.add) || operator.equals(BinaryOperator.sub) || operator.equals(BinaryOperator.mult) ||
                 operator.equals(BinaryOperator.div) || operator.equals(BinaryOperator.gt) || operator.equals(BinaryOperator.lt)){
             if (tl instanceof IntType && tr instanceof IntType)
-                return new IntType();
+                if (operator.equals(BinaryOperator.gt) || operator.equals(BinaryOperator.lt))
+                    return new BoolType();
+                else
+                    return new IntType();
 
             if ((tl instanceof NoType || tl instanceof IntType) && (tr instanceof IntType || tr instanceof NoType))
                 return new NoType();
@@ -99,9 +97,9 @@ public class TypeInferenceErrorCatcher extends Visitor<Type> {
                 try {
                     FunctionSymbolTableItem left_funcSym = (FunctionSymbolTableItem) (SymbolTable.root.getItem(FunctionSymbolTableItem.START_KEY + ((FptrType) tl).getFunctionName()));
                     FunctionSymbolTableItem right_funcSym = (FunctionSymbolTableItem) (SymbolTable.root.getItem(FunctionSymbolTableItem.START_KEY + ((FptrType) tr).getFunctionName()));
-                    ArrayList<Type> left_types = left_funcSym.getArgTypes();
+                    ArrayList<Type> left_types = (ArrayList<Type>) (left_funcSym.getArgTypes().clone());
                     left_types.add(left_funcSym.getReturnType());
-                    ArrayList<Type> right_types = right_funcSym.getArgTypes();
+                    ArrayList<Type> right_types = (ArrayList<Type>) (right_funcSym.getArgTypes().clone());
                     right_types.add(right_funcSym.getReturnType());
                     boolean flag = true;
                     if (left_types.size() == right_types.size()) {
@@ -164,9 +162,11 @@ public class TypeInferenceErrorCatcher extends Visitor<Type> {
                     else
                         break;
                 }
-                if ((left_el_type instanceof NoType || left_el_type instanceof IntType) && right_el_type instanceof IntType ||
-                        (left_el_type instanceof NoType || left_el_type instanceof BoolType) && right_el_type instanceof BoolType ||
-                        (left_el_type instanceof NoType || left_el_type instanceof StringType) && right_el_type instanceof StringType)
+                if (left_el_type instanceof IntType && right_el_type instanceof IntType ||
+                        left_el_type instanceof BoolType && right_el_type instanceof BoolType ||
+                        left_el_type instanceof StringType && right_el_type instanceof StringType)
+                    return new ListType(tr);
+                if (left_el_type instanceof NoType && (right_el_type instanceof IntType || right_el_type instanceof BoolType || right_el_type instanceof StringType || right_el_type instanceof ListType))
                     return new ListType(tr);
                 if ((left_el_type instanceof NoType || left_el_type instanceof IntType) && right_el_type instanceof NoType ||
                         (left_el_type instanceof NoType || left_el_type instanceof BoolType) && right_el_type instanceof NoType ||
@@ -225,12 +225,11 @@ public class TypeInferenceErrorCatcher extends Visitor<Type> {
     public Type visit(AnonymousFunction anonymousFunction) {
         try {
             FunctionSymbolTableItem functionSymbolTableItem = (FunctionSymbolTableItem) (SymbolTable.root.getItem(FunctionSymbolTableItem.START_KEY + anonymousFunction.getName()));
-            TypeSetterErrorCatcher.func_stack.push(functionSymbolTableItem);
+            TypeSetter.func_stack.push(functionSymbolTableItem);
             anonymousFunction.getBody().accept(this);
-            TypeSetterErrorCatcher.func_stack.pop();
-            return functionSymbolTableItem.getReturnType();
+            TypeSetter.func_stack.pop();
+            return new FptrType(anonymousFunction.getName());
         }catch (ItemNotFoundException e){}
-
         return new NoType();
     }
 
@@ -278,13 +277,13 @@ public class TypeInferenceErrorCatcher extends Visitor<Type> {
         if (instance_type instanceof VoidType){
             listAccessByIndex.addError(new CantUseValueOfVoidFunction(listAccessByIndex.getLine()));
         }
-        else if (!(instance_type instanceof NoType)){
+        else if (!(instance_type instanceof NoType || instance_type instanceof ListType)){
             listAccessByIndex.addError(new ListAccessByIndexOnNoneList(listAccessByIndex.getLine()));
         }
         if (index_type instanceof VoidType){
             listAccessByIndex.addError(new CantUseValueOfVoidFunction(listAccessByIndex.getLine()));
         }
-        else if (!(index_type instanceof NoType)){
+        else if (!(index_type instanceof NoType || index_type instanceof IntType)){
             listAccessByIndex.addError(new ListIndexNotInt(listAccessByIndex.getLine()));
         }
         return new NoType();
@@ -313,13 +312,6 @@ public class TypeInferenceErrorCatcher extends Visitor<Type> {
         Expression instance = funcCall.getInstance();
         ArrayList<Expression> args = funcCall.getArgs();
 
-        Type fptr2 = instance.accept(this);
-
-        if(!(fptr2 instanceof FptrType)){
-            System.out.println("Line" + funcCall.getLine());
-            return new NoType();
-        }
-
         FptrType fptr = (FptrType)instance.accept(this);
         try{
             FunctionSymbolTableItem functionSymbolTableItem = (FunctionSymbolTableItem)(SymbolTable.root.getItem(FunctionSymbolTableItem.START_KEY + fptr.getFunctionName()));
@@ -346,20 +338,21 @@ public class TypeInferenceErrorCatcher extends Visitor<Type> {
             }
 
             //TODO check for loop
-//            System.out.println(functionDeclaration.getFunctionName().getName());
-//            System.out.println(TypeSetterErrorCatcher.visited_function_name);
             if(!TypeSetterErrorCatcher.visited_function_name.contains(functionDeclaration.getFunctionName().getName())){
                 TypeSetterErrorCatcher.visited_function_name.add(functionDeclaration.getFunctionName().getName());
                 TypeSetterErrorCatcher.visited_function_declaration.add(functionDeclaration);
                 functionDeclaration.accept(typeSetterErrorCatcher);
             }
-
-            if(functionSymbolTableItem.getReturnType() == null)
+            Type return_type = functionSymbolTableItem.getReturnType();
+            if (return_type instanceof VoidType) {
+                funcCall.addError(new CantUseValueOfVoidFunction(funcCall.getLine()));
                 return new NoType();
-            return functionSymbolTableItem.getReturnType();
+            }
+            if (return_type == null)
+                return_type = new NoType();
+            return return_type;
         }
         catch (ItemNotFoundException e){}
-
         return new NoType();
     }
 

@@ -66,7 +66,10 @@ public class TypeInference extends Visitor<Type> {
         if (operator.equals(BinaryOperator.add) || operator.equals(BinaryOperator.sub) || operator.equals(BinaryOperator.mult) ||
                 operator.equals(BinaryOperator.div) || operator.equals(BinaryOperator.gt) || operator.equals(BinaryOperator.lt)){
             if (tl instanceof IntType && tr instanceof IntType)
-                return new IntType();
+                if (operator.equals(BinaryOperator.gt) || operator.equals(BinaryOperator.lt))
+                    return new BoolType();
+                else
+                    return new IntType();
 
             if ((tl instanceof NoType || tl instanceof IntType) && (tr instanceof IntType || tr instanceof NoType))
                 return new NoType();
@@ -98,9 +101,9 @@ public class TypeInference extends Visitor<Type> {
                 try {
                     FunctionSymbolTableItem left_funcSym = (FunctionSymbolTableItem) (SymbolTable.root.getItem(FunctionSymbolTableItem.START_KEY + ((FptrType) tl).getFunctionName()));
                     FunctionSymbolTableItem right_funcSym = (FunctionSymbolTableItem) (SymbolTable.root.getItem(FunctionSymbolTableItem.START_KEY + ((FptrType) tr).getFunctionName()));
-                    ArrayList<Type> left_types = left_funcSym.getArgTypes();
+                    ArrayList<Type> left_types = (ArrayList<Type>) (left_funcSym.getArgTypes().clone());
                     left_types.add(left_funcSym.getReturnType());
-                    ArrayList<Type> right_types = right_funcSym.getArgTypes();
+                    ArrayList<Type> right_types = (ArrayList<Type>) (right_funcSym.getArgTypes().clone());
                     right_types.add(right_funcSym.getReturnType());
                     boolean flag = true;
                     if (left_types.size() == right_types.size()) {
@@ -163,9 +166,11 @@ public class TypeInference extends Visitor<Type> {
                     else
                         break;
                 }
-                if ((left_el_type instanceof NoType || left_el_type instanceof IntType) && right_el_type instanceof IntType ||
-                        (left_el_type instanceof NoType || left_el_type instanceof BoolType) && right_el_type instanceof BoolType ||
-                        (left_el_type instanceof NoType || left_el_type instanceof StringType) && right_el_type instanceof StringType)
+                if (left_el_type instanceof IntType && right_el_type instanceof IntType ||
+                        left_el_type instanceof BoolType && right_el_type instanceof BoolType ||
+                        left_el_type instanceof StringType && right_el_type instanceof StringType)
+                    return new ListType(tr);
+                if (left_el_type instanceof NoType && (right_el_type instanceof IntType || right_el_type instanceof BoolType || right_el_type instanceof StringType || right_el_type instanceof ListType))
                     return new ListType(tr);
                 if ((left_el_type instanceof NoType || left_el_type instanceof IntType) && right_el_type instanceof NoType ||
                         (left_el_type instanceof NoType || left_el_type instanceof BoolType) && right_el_type instanceof NoType ||
@@ -276,14 +281,14 @@ public class TypeInference extends Visitor<Type> {
         if (instance_type instanceof VoidType){
             //void error
         }
-        else if (!(instance_type instanceof NoType)){
-            //instance error
+        else if (!(instance_type instanceof NoType || instance_type instanceof ListType)){
+            //access on non list
         }
         if (index_type instanceof VoidType){
             //void error
         }
-        else if (!(index_type instanceof NoType)){
-            //index error
+        else if (!(index_type instanceof NoType || index_type instanceof IntType)){
+            //index not integer
         }
         return new NoType();
     }
@@ -312,7 +317,6 @@ public class TypeInference extends Visitor<Type> {
         ArrayList<Expression> args = funcCall.getArgs();
         FptrType fptr = (FptrType)instance.accept(this);
 
-        System.out.println(fptr.getFunctionName());
         try{
             FunctionSymbolTableItem functionSymbolTableItem = (FunctionSymbolTableItem)(SymbolTable.root.getItem(FunctionSymbolTableItem.START_KEY + fptr.getFunctionName()));
             FunctionDeclaration functionDeclaration = functionSymbolTableItem.getFuncDeclaration();
@@ -325,7 +329,6 @@ public class TypeInference extends Visitor<Type> {
                     for (Map.Entry<Identifier, Expression> arg_with_key : funcCall.getArgsWithKey().entrySet()) {
                         if (arg_with_key.getKey().getName().equals(arg.getName())) {
                             arg_type = arg_with_key.getValue().accept(this);
-                            System.out.println(arg.getName() + " - " + arg_type.toString());
                             //TODO Check function argument type (optional)
                             break;
                         }
@@ -333,7 +336,6 @@ public class TypeInference extends Visitor<Type> {
                 }
                 else {
                     arg_type = args.get(arg_index).accept(this);
-                    System.out.println(arg.getName() + " - " + arg_type.toString());
                     //Type func_arg_type = functionSymbolTableItem.getArgTypes().get(arg_index);
                     //TODO Check function argument type (optional)
                 }
@@ -347,20 +349,21 @@ public class TypeInference extends Visitor<Type> {
             }
 
             //TODO check for loop
-//            System.out.println(functionDeclaration.getFunctionName().getName());
-//            System.out.println(TypeSetter.visited_function_name);
             if(!TypeSetter.visited_function_name.contains(functionDeclaration.getFunctionName().getName())){
                 TypeSetter.visited_function_name.add(functionDeclaration.getFunctionName().getName());
                 TypeSetter.visited_function_declaration.add(functionDeclaration);
                 functionDeclaration.accept(typeSetter);
             }
-            System.out.println("Return = " + functionSymbolTableItem.getReturnType());
-            if(functionSymbolTableItem.getReturnType() == null)
+            Type return_type = functionSymbolTableItem.getReturnType();
+            if (return_type instanceof VoidType) {
+                //void error
                 return new NoType();
-            return functionSymbolTableItem.getReturnType();
+            }
+            if (return_type == null)
+                return_type = new NoType();
+            return return_type;
         }
         catch (ItemNotFoundException e){}
-
         return new NoType();
     }
 
