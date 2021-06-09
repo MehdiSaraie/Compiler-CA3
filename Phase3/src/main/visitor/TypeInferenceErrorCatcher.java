@@ -328,32 +328,71 @@ public class TypeInferenceErrorCatcher extends Visitor<Type> {
         Expression instance = funcCall.getInstance();
         ArrayList<Expression> args = funcCall.getArgs();
 
-        FptrType fptr = (FptrType)instance.accept(this);
+        Type fptr2 = instance.accept(this);
+        if (!(fptr2 instanceof FptrType)){
+            if (!(fptr2 instanceof NoType))
+                funcCall.addError(new CallOnNoneFptrType(funcCall.getLine()));
+            if (args.isEmpty()) {
+                for (Map.Entry<Identifier, Expression> arg_with_key : funcCall.getArgsWithKey().entrySet()) {
+                    arg_with_key.getValue().accept(this);
+                }
+            }
+            else{
+                for (Expression arg : args)
+                    arg.accept(this);
+            }
+            return new NoType();
+        }
+        FptrType fptr = (FptrType)fptr2;
         try{
             FunctionSymbolTableItem functionSymbolTableItem = (FunctionSymbolTableItem)(SymbolTable.root.getItem(FunctionSymbolTableItem.START_KEY + fptr.getFunctionName()));
             FunctionDeclaration functionDeclaration = functionSymbolTableItem.getFuncDeclaration();
             Type arg_type = new NoType();
             int arg_index = 0;
-
+            boolean flag = false;
             for (Identifier arg : functionDeclaration.getArgs()) {
                 if (args.isEmpty()) {
+                    if (arg_index >= funcCall.getArgsWithKey().size()){
+                        flag = true;
+                        break;
+                    }
                     for (Map.Entry<Identifier, Expression> arg_with_key : funcCall.getArgsWithKey().entrySet()) {
                         if (arg_with_key.getKey().getName().equals(arg.getName())) {
                             arg_type = arg_with_key.getValue().accept(this);
-                            //TODO Check function argument type (optional)
                             break;
                         }
                     }
                 }
                 else {
+                    if (arg_index >= args.size()){
+                        flag = true;
+                        break;
+                    }
                     arg_type = args.get(arg_index).accept(this);
-                    Type func_arg_type = functionSymbolTableItem.getArgTypes().get(arg_index);
-                    //TODO Check function argument type (optional)
                 }
+
+                if(TypeSetter.visited_function_name.contains(functionDeclaration.getFunctionName().getName())) {
+                    Type func_arg_type = functionSymbolTableItem.getArgTypes().get(arg_index);
+                    if (TypeSetterErrorCatcher.checkTypeEquality(func_arg_type, arg_type))
+                        flag = true;
+                }
+
                 arg_index++;
             }
 
-            //TODO check for loop
+            if (arg_index < args.size()){
+                flag = true;
+                for(int index = arg_index; index < args.size(); index++)
+                    args.get(arg_index).accept(this);
+            }
+
+            if (flag){
+                funcCall.addError(new FunctionCallNotMatchDefinition(funcCall.getLine()));
+                return new NoType();
+            }
+
+
+            //check for loop
             if(!TypeSetterErrorCatcher.visited_function_name.contains(functionDeclaration.getFunctionName().getName())){
                 TypeSetterErrorCatcher.visited_function_name.add(functionDeclaration.getFunctionName().getName());
                 TypeSetterErrorCatcher.visited_function_declaration.add(functionDeclaration);
